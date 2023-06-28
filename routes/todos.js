@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 const _ = require("lodash");
 const { Todo, validate } = require("../models/todo");
+const auth = require("../middleware/auth");
+const { User } = require("../models/user");
 
 router.get("/", async (req, res) => {
   const todos = await Todo.find();
@@ -15,16 +17,22 @@ router.get("/:id", async (req, res) => {
   res.send(todo);
 });
 
-router.post("/", async (req, res) => {
+router.post("/", auth, async (req, res) => {
   const { error } = validate(req.body);
   if (error) return res.status(200).send(error.details[0].message);
 
-  const todo = new Todo(_.pick(req.body, ["name"]));
+  const user = await User.findById(req.user._id);
+  if (!user) return res.status(404).send("No user exists with given user id");
+
+  const todo = new Todo({
+    name: req.body.name,
+    userId: user._id,
+  });
   const result = await todo.save();
   res.send(result);
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", auth, async (req, res) => {
   const { error } = validate(req.body);
   if (error) return res.status(200).send(error.details[0].message);
 

@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const Joi = require("joi");
+Joi.ObjectId = require("joi-objectid")(Joi);
 
 const todoSchema = new mongoose.Schema({
   name: {
@@ -16,6 +17,10 @@ const todoSchema = new mongoose.Schema({
   created: {
     type: Date,
     default: Date.now,
+  },
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    required: true,
   },
 });
 
