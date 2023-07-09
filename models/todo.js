@@ -28,8 +28,8 @@ const Todo = mongoose.model("Todo", todoSchema);
 
 function validate(todo) {
   const schema = Joi.object({
+    _id: Joi.string(),
     name: Joi.string().min(3).max(50).required(),
-    status: Joi.number(),
   });
 
   return schema.validate(todo);
