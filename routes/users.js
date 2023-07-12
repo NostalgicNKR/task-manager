@@ -8,7 +8,10 @@ const auth = require("../middleware/auth");
 
 router.post("/register", async (req, res) => {
   const { error } = validate(req.body);
-  if (error) return res.status(401).send(error.details[0].message);
+  if (error) return res.status(400).send(error.details[0].message);
+
+  const userFound = await User.findOne({ email: req.body.email });
+  if (userFound) return res.status(404).send("Email already exists!");
 
   const user = new User(_.pick(req.body, ["email", "name", "password"]));
   const salt = await bcrypt.genSalt(10);
@@ -20,7 +23,7 @@ router.post("/register", async (req, res) => {
 
 router.put("/update", auth, async (req, res) => {
   const { error } = validateUpdate(req.body);
-  if (error) return res.status(401).send(error.details[0].message);
+  if (error) return res.status(400).send(error.details[0].message);
 
   const user = await User.findOne({ email: req.body.email });
   if (!user) return res.status(404).send("User not found with given email");

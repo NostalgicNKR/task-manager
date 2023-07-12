@@ -30,6 +30,7 @@ function validate(todo) {
   const schema = Joi.object({
     _id: Joi.string(),
     name: Joi.string().min(3).max(50).required(),
+    deadline: Joi.date(),
   });
 
   return schema.validate(todo);

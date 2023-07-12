@@ -7,32 +7,110 @@ const auth = require("../middleware/auth");
 const { User } = require("../models/user");
 const mongoose = require("mongoose");
 
-// router.get("/", auth, async (req, res) => {
-//   const todos = await Todo.find({ userId: req.user._id }).sort("-created");
-//   if (!todos) return res.send("Empty Todo List");
-//   res.send(todos);
-// });
-
 router.get("/", auth, async (req, res) => {
-  const availableSorts = ["name", "-name", "created", "-created"];
+  //Supported Queries: sort, status, deadline
+
+  const match = {};
+  const availableSorts = [
+    "name",
+    "-name",
+    "created",
+    "-created",
+    "deadline",
+    "-deadline",
+  ];
   const sortOrder =
     req.query.sort && availableSorts.includes(req.query.sort)
       ? req.query.sort
       : "-created";
   const filters = { userId: req.user._id };
-  if (req.query.status == 1 || req.query.status == 0) {
-    filters.status = parseInt(req.query.status);
+
+  if (req.query.deadline === "isToday") {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    filters.deadline = {
+      $gte: today,
+      $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
+    };
   }
-  const todos = await Todo.find(filters).sort(sortOrder);
+
+  if (req.query.deadline === "isTomorrow") {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    filters.deadline = {
+      $gte: tomorrow,
+      $lt: new Date(tomorrow.getTime() + 24 * 60 * 60 * 1000),
+    };
+  }
+
+  if (req.query.deadline === "isThisWeek") {
+    const currentDate = new Date();
+    const tomorrow = new Date(currentDate);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const dayAfterTomorrow = new Date(currentDate);
+    dayAfterTomorrow.setHours(0, 0, 0, 0);
+    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+
+    const lastDayOfWeek = new Date(currentDate);
+    lastDayOfWeek.setHours(23, 59, 59, 999);
+    lastDayOfWeek.setDate(lastDayOfWeek.getDate() + (6 - currentDate.getDay()));
+
+    let deadlineGte = dayAfterTomorrow;
+    if (currentDate.getDay() !== 5 || currentDate.getDay() !== 6)
+      filters.deadline = {
+        $gte: deadlineGte,
+        $lte: lastDayOfWeek,
+      };
+  }
+
+  if (req.query.deadline === "isNextWeek") {
+    const nextWeekSunday = new Date();
+    nextWeekSunday.setHours(0, 0, 0, 0);
+    nextWeekSunday.setDate(
+      nextWeekSunday.getDate() + (7 - nextWeekSunday.getDay())
+    );
+
+    const nextWeekSaturday = new Date(nextWeekSunday);
+    nextWeekSaturday.setHours(23, 59, 59, 999);
+    nextWeekSaturday.setDate(nextWeekSaturday.getDate() + 6);
+
+    filters.deadline = {
+      $gte: nextWeekSunday,
+      $lte: nextWeekSaturday,
+    };
+  }
+
+  if (req.query.deadline === "isOverdue") {
+    const currentTime = new Date();
+    filters.status = 0;
+    filters.deadline = {
+      $lte: currentTime,
+    };
+  }
+
+  const statuses = ["isPending", "isCompleted"];
+  if (statuses.includes(req.query.status)) {
+    filters.status = statuses.indexOf(req.query.status);
+  }
+  if (req.query.page > 0) {
+    match.page = req.query.page ? req.query.page : 1;
+    match.limit = req.query.limit ? req.query.limit : 10;
+    match.skip = (match.page - 1) * match.limit;
+  }
+  const todos = await Todo.find(filters)
+    .sort(sortOrder)
+    .skip(match.skip)
+    .limit(match.limit);
+  const totalCount = await Todo.countDocuments(filters);
   if (!todos) return res.send("Empty Todo List");
-  res.send(todos);
-});
-
-router.get("/:id", async (req, auth, res) => {
-  const todo = await Todo.findById(req.params.id);
-  if (!todo) return res.status(404).send("Todo not found with given ID");
-
-  res.send(todo);
+  res.send({
+    total: totalCount,
+    page: match.page,
+    pageSize: todos.length,
+    results: todos,
+  });
 });
 
 router.post("/", auth, async (req, res) => {
@@ -45,6 +123,7 @@ router.post("/", auth, async (req, res) => {
   const todo = new Todo({
     name: req.body.name,
     userId: user._id,
+    deadline: req.body.deadline,
   });
   const result = await todo.save();
   res.send(result);
