@@ -6,9 +6,10 @@ const users = require("./routes/users");
 const auth = require("./routes/auth");
 const profile = require("./routes/profile");
 const cors = require("cors");
+const config = require("config");
 
 mongoose
-  .connect("mongodb://127.0.0.1:27017/todoproject")
+  .connect(config.get("db-url"))
   .then(() => console.log("Connected to mongo successfully!"))
   .catch((err) =>
     console.log("Something failed while connected to mongodb!", err)
@@ -25,4 +26,5 @@ app.use("/api/auth/", users);
 app.use("/api/auth/login", auth);
 app.use("/api/me", profile);
 
-app.listen(3500, () => console.log("Listening on Port: 3500"));
+const PORT = config.get("port") || 3500;
+app.listen(PORT, () => console.log("Listening on Port: " + PORT));
