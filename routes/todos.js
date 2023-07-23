@@ -25,6 +25,13 @@ router.get("/", auth, async (req, res) => {
       : "-created";
   const filters = { userId: req.user._id };
 
+  const supportedDeadlines = [
+    "isToday",
+    "isTomorrow",
+    "isThisWeek",
+    "isNextWeek",
+    "isOverdue",
+  ];
   if (req.query.deadline === "isToday") {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -99,12 +106,21 @@ router.get("/", auth, async (req, res) => {
     match.limit = req.query.limit ? req.query.limit : 10;
     match.skip = (match.page - 1) * match.limit;
   }
+
+  if (!supportedDeadlines.includes(req.query.deadline)) {
+    const currentTime = new Date();
+    filters.status = 0;
+    filters.deadline = {
+      $gte: currentTime,
+    };
+  }
+
   const todos = await Todo.find(filters)
     .sort(sortOrder)
     .skip(match.skip)
     .limit(match.limit);
-  const totalCount = await Todo.countDocuments(filters);
   if (!todos) return res.send("Empty Todo List");
+  const totalCount = await Todo.countDocuments(filters);
   res.send({
     total: totalCount,
     page: match.page,
